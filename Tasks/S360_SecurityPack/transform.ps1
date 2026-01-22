@@ -1,5 +1,16 @@
 # S360 SecurityPack - Data Transformation Script
 # Converts Kusto query results to GenevaActions batch format
+#
+# Usage: .\transform.ps1 -InputFile <path-to-csv>
+# Example: .\transform.ps1 -InputFile ".\kusto_results.csv"
+
+param(
+    [Parameter(Mandatory=$true, HelpMessage="Path to the input CSV file containing Kusto query results")]
+    [string]$InputFile
+)
+
+# Required columns for input CSV
+$requiredColumns = @('SubscriptionId', 'SubscriptionName', 'Region', 'ResourceGroup', 'RoleInstanceName', 'IsRunningAzSecPack')
 
 function Convert-ToBase36 {
     param([int]$Number)
@@ -30,23 +41,52 @@ function Convert-RoleInstanceName {
     return $Name
 }
 
-# Query results data (from Kusto)
-$queryData = @(
-    @{SubscriptionId='720cfcbe-dd20-4df4-85b0-221e7f17a569'; SubscriptionName='AzureSignalR Production AustraliaEast'; Region='Australia East'; ResourceGroup='srprodacsaueb'; RoleInstanceName='k8s-egwebpubsub-92268319-z1-vmss_1'; IsRunningAzSecPack='NO'},
-    @{SubscriptionId='720cfcbe-dd20-4df4-85b0-221e7f17a569'; SubscriptionName='AzureSignalR Production AustraliaEast'; Region='Australia East'; ResourceGroup='srprodacsaueb'; RoleInstanceName='k8s-egwebpubsub-92268319-z2-vmss_0'; IsRunningAzSecPack='NO'},
-    @{SubscriptionId='9ac1c814-ec67-4a83-b4c8-924116c868f9'; SubscriptionName='AzureSignalR Bleu  bleuc'; Region='Bleu France Central'; ResourceGroup=''; RoleInstanceName='aks-rp-15381743-vmss_0'; IsRunningAzSecPack='NO'},
-    @{SubscriptionId='9ac1c814-ec67-4a83-b4c8-924116c868f9'; SubscriptionName='AzureSignalR Bleu  bleuc'; Region='Bleu France Central'; ResourceGroup=''; RoleInstanceName='aks-rp-15381743-vmss_1'; IsRunningAzSecPack='NO'},
-    @{SubscriptionId='9ac1c814-ec67-4a83-b4c8-924116c868f9'; SubscriptionName='AzureSignalR Bleu  bleuc'; Region='Bleu France Central'; ResourceGroup=''; RoleInstanceName='aks-rp-15381743-vmss_2'; IsRunningAzSecPack='NO'},
-    @{SubscriptionId='9ac1c814-ec67-4a83-b4c8-924116c868f9'; SubscriptionName='AzureSignalR Bleu  bleuc'; Region='Bleu France Central'; ResourceGroup=''; RoleInstanceName='aks-rp-15381743-vmss_3'; IsRunningAzSecPack='NO'},
-    @{SubscriptionId='9ac1c814-ec67-4a83-b4c8-924116c868f9'; SubscriptionName='AzureSignalR Bleu  bleuc'; Region='Bleu France Central'; ResourceGroup=''; RoleInstanceName='aks-rp-15381743-vmss_4'; IsRunningAzSecPack='NO'},
-    @{SubscriptionId='9ac1c814-ec67-4a83-b4c8-924116c868f9'; SubscriptionName='AzureSignalR Bleu  bleuc'; Region='Bleu France Central'; ResourceGroup=''; RoleInstanceName='aks-system-15381743-vmss_0'; IsRunningAzSecPack='NO'},
-    @{SubscriptionId='f6449602-c95f-4ebb-a12d-ad164dc41c8d'; SubscriptionName='AzureSignalR Production BrazilSouth'; Region='Brazil South'; ResourceGroup='srprodacsbrsa'; RoleInstanceName='k8s-system-27916122-vmss_0'; IsRunningAzSecPack='NO'},
-    @{SubscriptionId='c67c7f54-2c85-4ef7-90ca-f9488da97c7f'; SubscriptionName='AzureSignalR Production CanadaCentral'; Region='Canada Central'; ResourceGroup='srprodacscacea'; RoleInstanceName='k8s-egwebpubsub-77314816-z2-vmss_1'; IsRunningAzSecPack='NO'}
-)
+function Test-InputFileFormat {
+    param(
+        [string]$FilePath,
+        [string[]]$RequiredColumns
+    )
+    
+    # Check if file exists
+    if (-not (Test-Path $FilePath)) {
+        Write-Error "Input file not found: $FilePath"
+        return $false
+    }
+    
+    # Read first line to get headers
+    $headers = (Get-Content $FilePath -First 1) -split ','
+    $headers = $headers | ForEach-Object { $_.Trim().Trim('"') }
+    
+    # Check for required columns
+    $missingColumns = @()
+    foreach ($col in $RequiredColumns) {
+        if ($col -notin $headers) {
+            $missingColumns += $col
+        }
+    }
+    
+    if ($missingColumns.Count -gt 0) {
+        Write-Error "Missing required columns: $($missingColumns -join ', ')"
+        Write-Output "Expected columns: $($RequiredColumns -join ', ')"
+        Write-Output "Found columns: $($headers -join ', ')"
+        return $false
+    }
+    
+    Write-Output "Input file format validated successfully."
+    Write-Output "Found columns: $($headers -join ', ')"
+    return $true
+}
+
+# Validate input file format
+if (-not (Test-InputFileFormat -FilePath $InputFile -RequiredColumns $requiredColumns)) {
+    exit 1
+}
+
+# Read query data from CSV file
+$queryData = Import-Csv -Path $InputFile
 
 # Transform to GenevaActions format
-$genevaActionsData = @()
-$executionResults = @()
+$transformedData = @()
 
 foreach ($item in $queryData) {
     # Build ACSCluster: SubscriptionId + ResourceGroup (no separator)
@@ -55,35 +95,43 @@ foreach ($item in $queryData) {
     # Convert RoleInstanceName to AgentNodeName
     $agentNodeName = Convert-RoleInstanceName -Name $item.RoleInstanceName
     
-    $genevaActionsData += [PSCustomObject]@{
+    $transformedData += [PSCustomObject]@{
         ACSCluster = $acsCluster
         AgentNodeName = $agentNodeName
-    }
-    
-    $executionResults += [PSCustomObject]@{
+        Region = $item.Region
         SubscriptionId = $item.SubscriptionId
         SubscriptionName = $item.SubscriptionName
-        Region = $item.Region
         ResourceGroup = $item.ResourceGroup
         RoleInstanceName = $item.RoleInstanceName
     }
 }
 
+# Sort by Region
+$sortedData = $transformedData | Sort-Object -Property Region
+
+# Prepare output data
+$genevaActionsData = $sortedData | Select-Object ACSCluster, AgentNodeName
+$executionResults = $sortedData | Select-Object SubscriptionId, SubscriptionName, Region, ResourceGroup, RoleInstanceName
+
 # Export results
 $timestamp = (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmssfff')
-$resultPath = "d:\Code\GitHub_JX\x-tests\Tasks\S360_SecurityPack\$timestamp.md"
-$logPath = "d:\Code\GitHub_JX\x-tests\Tasks\S360_SecurityPack\$timestamp.txt"
-$csvPath = "d:\Code\GitHub_JX\x-tests\Tasks\S360_SecurityPack\$timestamp.csv"
+$outputDir = Split-Path -Parent $InputFile
+$resultPath = Join-Path $outputDir "$timestamp.md"
+$logPath = Join-Path $outputDir "$timestamp.txt"
+$csvPath = Join-Path $outputDir "$timestamp.csv"
 
 # Create GenevaActions CSV
 $genevaActionsData | Export-Csv -Path $csvPath -NoTypeInformation
 
+Write-Output ""
 Write-Output "Transformation complete!"
+Write-Output "Input file: $InputFile"
 Write-Output "Total VMs processed: $($queryData.Count)"
 Write-Output "GenevaActions batch file: $csvPath"
+Write-Output "Results sorted by Region"
 Write-Output ""
-Write-Output "First 5 transformed records:"
-$genevaActionsData | Select-Object -First 5 | Format-Table -AutoSize
+Write-Output "First 5 transformed records (sorted by Region):"
+$sortedData | Select-Object Region, ACSCluster, AgentNodeName -First 5 | Format-Table -AutoSize
 
 # Return paths for file creation
 @{
