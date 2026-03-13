@@ -15,6 +15,14 @@ People-scoped dashboard (overview in browser):
 https://vnext.s360.msftcloudes.com/blades/allup?peopleBasedNodes=kenchen_team&blade=Tab:KPI~isExpanded:false~KPIType:ActionItems;LaunchCriteria;Metric~_loc:allUp&global=@KENCHEN%2BKen%20Chen%20(KENCHEN)
 ```
 
+## S360 Link Guidance
+
+- This repo currently documents one verified S360 URL: the full people-scoped dashboard URL above.
+- A stable per-KPI S360 URL template has not been documented in this repo yet.
+- If the S360 API returns a dedicated KPI-detail URL in the payload, use that exact URL verbatim. Usually like `https://vnext.s360.msftcloudes.com/blades/security?global=@KENCHEN%2BKen%20Chen%20(KENCHEN)&blade=KPI:{KpiId}}~SLA:3~AssignedTo:AssignedToServices~Forums:All~waves:All~Tab:Summary~_loc:Security&peopleBasedNodes=kenchen_team`
+- Otherwise, fall back to the full dashboard URL above exactly as written. Do not shorten it to only `https://vnext.s360.msftcloudes.com/blades/allup?peopleBasedNodes=kenchen_team` because that drops the blade context needed for the intended Action Items view.
+- Until a verified per-KPI URL template is added here, do not construct S360 links from `KpiId` alone.
+
 ## API Configuration
 
 The S360-breeze MCP tool uses `targetIds` (service tree IDs), not the people-scoped URL. Pass the targetId above as:

@@ -75,9 +75,9 @@ Present a markdown table ordered by severity (Red → Yellow → Green):
 
 ### 🔴 Red (Out of SLA)
 
-| KPI Title | Items | Due Date | Exceptions | Clouds | S360 | TSG |
-|-----------|-------|----------|------------|--------|------|-----|
-| {Title} | {count} | {earliest due} | {exceptions} | {clouds} | [S360 Link]({per-KPI S360 URL}) | [TSG]({URL}) |
+| KPI Title | KPI ID | Items | Due Date | Exceptions | Clouds | S360 | TSG |
+|-----------|--------|-------|----------|------------|--------|------|-----|
+| {Title} | `{kpiId}` | {count} | {earliest due} | {exceptions} | {clouds} | [S360]({resolved S360 URL}) | [TSG]({URL}) |
 
 ### 🟡 Yellow (Approaching SLA)
 
@@ -88,7 +88,11 @@ Present a markdown table ordered by severity (Red → Yellow → Green):
 (same table format)
 ```
 
-**Per-KPI S360 link**: Each row should include a direct link to the S360 dashboard KPI detail page so the user can click through to the S360 UI for that specific KPI. Construct the link from the KPI ID and service-config data. If the API response includes a per-KPI URL, use it; otherwise use the main dashboard URL from `references/service-config.md`.
+**S360 link resolution**: Resolve the S360 URL in this exact order:
+1. If the S360 API response already includes a dedicated KPI-detail URL for the group, use that exact URL verbatim.
+2. Otherwise, use the full people-scoped dashboard URL from `references/service-config.md` exactly as written there.
+
+Do not invent or synthesize a per-KPI S360 URL from `KpiId` alone unless a verified URL template has been documented in `references/service-config.md`. Do not shorten the dashboard fallback to only `peopleBasedNodes=...`; preserve the full URL including the `blade` and `global` parameters.
 
 **TSG column**: Show the `URL` field value (usually an eng.ms TSG doc link). If `CustomDimensions.ActionWikiLink` is also available, show it as a second link.
 
@@ -113,4 +117,4 @@ Save the full report to `Tasks/S360_Dashboard/{yyyyMMdd_HHmmss}_overview.md` usi
 - `SLAState` from the API is the authoritative red/yellow/green classification. Do not recompute from dates — the API accounts for exceptions, ETA extensions, and SLA policies that date math alone would miss.
 - Some KPI groups span multiple clouds (Public, Fairfax, Mooncake). Show distinct cloud values in the Clouds column.
 - If `ExceptionCount > 0`, mention it — exceptions indicate items with approved SLA overrides.
-- Every KPI row **must** include a clickable S360 link so the user can jump to the S360 dashboard to investigate individual items without needing to run another command.
+- Every KPI row **must** include a clickable S360 link. If no verified per-KPI link is available from the API or documented config, use the full dashboard URL and rely on the visible `KPI ID` column for drill-in.

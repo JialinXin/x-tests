@@ -1,20 +1,54 @@
 ---
 name: s360-item-detail-1.0.0
-description: "Deep-dive into a specific S360 KPI action item to extract affected Azure ResourceIds, subscription details, and remediation links. Use when the user wants to see which resources are affected by an S360 action item, asks for S360 item details, wants ResourceIds for an S360 KPI, says 'drill into S360 item', 'show resources for this S360 KPI', 'what resources need remediation', or provides an S360 KPI ID / action item ID / action item title to investigate. Also use when the user wants to understand what specific work is needed for an S360 compliance item."
+description: "Multi-hop investigation of an S360 KPI action item: extract affected resources or objects, follow linked evidence recursively, explain what the Azure SignalR Service team must do, and stop only on permission, corpnet, or tooling blockers. Use when the user asks for S360 item details, KPI impact analysis, remediation steps, required follow-up work, or provides an S360 KPI ID, action item ID, title, or related URL."
 ---
 
 # S360 Item Detail
 
-Extract and present detailed resource information for a specific S360 KPI action item group. Different KPI types store resource information differently — this skill dispatches the right extraction strategy automatically.
+Investigate a specific S360 KPI action item group deeply. This skill is not limited to listing resources. It should extract affected resources or other affected objects, follow linked evidence until the task is clearly understood, ground the interpretation in Azure SignalR Service context, and synthesize concrete work items the service team must complete.
 
 ## Prerequisites
 
 This skill requires:
 - **s360-breeze** MCP — `search_active_s360_kpi_action_items`, `get_active_s360_action_item_for_kpi`, `get_s360_kpi_metadata_by_kpi_id`
-- **kusto** MCP — `execute_query` for Kusto-backed KPIs (best-effort)
-- **fetch_webpage** — For linked documentation (best-effort)
+- **kusto** MCP — `execute_query` for Kusto-backed KPIs when cluster access exists
+- **fetch_webpage** — Required for linked docs, TSGs, dashboards, work item pages, and recursive evidence following
+- **browser / Playwright-style MCP tools** — Fallback path for rendered pages, redirects, interactive auth flows, or docs that `fetch_webpage` cannot read reliably
+- **Azure resource detail source when available** — Optional but preferred for resource owner enrichment when a KPI identifies concrete Azure resources and name-based heuristics are insufficient
 
-Read `references/resource-extraction-guide.md` for the per-KPI-type extraction strategies and real data examples.
+Read `references/resource-extraction-guide.md` for the per-KPI-type investigation strategies, real data examples, and blocker handling rules.
+
+## Investigation Goals
+
+1. **Extract affected objects** — Identify which Azure resources, infrastructure objects, applications, dashboards, or workflow items are flagged by the KPI.
+2. **Follow linked evidence** — Traverse all reachable evidence links in priority order and continue while a source yields new actionable content.
+3. **Map to service context** — Tie findings back to Azure SignalR Service, targetId `624c481d-e51c-4016-a522-fbe180d125fc`, known resource types, app names, and workflow names.
+4. **Infer likely owner for concrete Azure resources when possible** — Use a deterministic, lightweight rule chain to annotate likely owners without overstating certainty.
+5. **Synthesize concrete work items** — Translate raw findings into explicit statements of what the service team must do.
+6. **Stop only on blockers** — Only stop when the next source requires auth, corpnet, unsupported tooling, or another hard blocker. Report that blocker precisely.
+
+## Team Alias Map For Owner Inference
+
+Use this map when inferring likely owners from Azure resource names, resource groups, or Azure metadata.
+
+| Name | Alias |
+|------|-------|
+| Binjie Qian | `biqian` |
+| Dayang Shen | `dayshen` |
+| Haofan Liao | `haofanliao` |
+| Jialin Xin | `jixin` |
+| Jie Zong | `jiezong` |
+| Ken Chen | `kenchen` |
+| Kevin Guo | `kevinguo` |
+| Liangying Wei | `lianwei` |
+| Shiying Chen | `shiyingchen` |
+| Siyuan Xing | `siyuanxing` |
+| Siyuan Zheng | `siyzhe` |
+| Yunchi Wang | `yunwang` |
+| Zhenghui Yan | `zhy` |
+| Zitong Yang | `zityang` |
+
+Treat alias matching as case-insensitive. Normalize all candidate strings to lowercase before comparison.
 
 ## Workflow
 
@@ -26,46 +60,120 @@ The user may provide:
 |-------|--------------|
 | KPI ID (UUID) | Use directly as `kpiId` |
 | KPI action item ID | Use with `get_active_s360_action_item_for_kpi(kpiId, kpiActionItemId)` |
-| Title text (e.g., "Disable local auth") | Fetch all items via `search_active_s360_kpi_action_items`, filter by `Title` match |
-| S360 URL | Parse `kpiId` from URL path/query parameters |
+| Title text | Fetch all items via `search_active_s360_kpi_action_items`, then filter by `Title` match |
+| S360 URL | Parse `kpiId` from URL path or query parameters |
 
-If only a title is given, use `search_active_s360_kpi_action_items(targetIds=["624c481d-e51c-4016-a522-fbe180d125fc"], pageSize=50)` with pagination, and filter results where `Title` contains or matches the user's text (case-insensitive).
+If only a title is given, use `search_active_s360_kpi_action_items(targetIds=["624c481d-e51c-4016-a522-fbe180d125fc"], pageSize=50)` with pagination and filter results where `Title` contains or matches the user's text case-insensitively.
 
 ### Step 2: Fetch Items
 
-**For a KPI group** (most common — user wants all items under one KPI):
-- Fetch all items via `search_active_s360_kpi_action_items` with pagination
-- Filter to items matching the target `KpiId`
+For a KPI group:
+- Fetch all items via `search_active_s360_kpi_action_items` with pagination.
+- Filter to items matching the target `KpiId`.
 
-**For a single action item**:
-- Call `get_active_s360_action_item_for_kpi(kpiId, kpiActionItemId)` directly
+For a single action item:
+- Call `get_active_s360_action_item_for_kpi(kpiId, kpiActionItemId)` directly.
+
+Collect enough raw payload detail to preserve all candidate evidence fields such as `URL`, `CustomDimensions.ActionWikiLink`, `CustomDimensions.url2`, `CustomDimensions.AssetTypeLink0`, `reportUrl`, and other URL-like fields.
 
 ### Step 3: Fetch KPI Metadata
 
-Call `get_s360_kpi_metadata_by_kpi_id(kpiId)` to get:
+Call `get_s360_kpi_metadata_by_kpi_id(kpiId)` to obtain:
 - KPI description and remediation guidance
-- Associated data sources (Kusto queries, dashboards)
-- KPI category and program info
+- Associated data sources such as dashboards, queries, and portals
+- KPI category and program context
+- Any embedded documentation links or workflow clues
 
-This provides context for what the KPI measures and how to fix issues.
+Always inspect the metadata description text for remediation steps, workflow names, supportability hints, and embedded links.
 
-**Important**: The KPI description often contains TSG links or remediation steps — always check it. TSG links are usually on eng.ms. Some KPIs also embed TSG references in Kusto dashboard descriptions.
+### Step 4: Extract Affected Objects
 
-### Step 4: Extract Resources
+Dispatch based on the data pattern observed in the action items.
 
-Dispatch based on the data pattern observed in the action items. Read `references/resource-extraction-guide.md` for the full strategy guide.
+| Signal in item data | Type | What is affected |
+|---------------------|------|------------------|
+| `CustomDimensions.resourceId` is a full ARM path | Type A | Individual Azure resources |
+| `CustomDimensions.AssetTypeLink0` is an ADX dashboard URL | Type B | Aggregated infrastructure objects |
+| `URL` contains Azure Resource Graph query | Type C | Queried infrastructure by subscription or region |
+| `CustomDimensions.ApplicationId` with `reportUrl` | Type D | Applications and identities |
+| Title or evidence indicates onboarding, ASP, ADO, compliance process, or workflow task | Type E | Workflow or process deliverables |
+| None of the above | Unknown | Present all fields and infer pattern from evidence |
 
-**Quick dispatch table:**
+Read `references/resource-extraction-guide.md` for the detailed strategy per type.
 
-| Signal in item data | Type | Strategy |
-|---------------------|------|----------|
-| `CustomDimensions.resourceId` is a full ARM path | Type A | Extract resourceId directly from each item |
-| `CustomDimensions.AssetTypeLink0` is an ADX dashboard URL | Type B | Provide dashboard link + TotalCount; optionally parse Kusto query |
-| `URL` contains Azure Resource Graph query (portal.azure.com + ArgExplorer) | Type C | Decode the ARG query and present it; extract SubscriptionId, Region |
-| `CustomDimensions.ApplicationId` + `reportUrl` present | Type D | Present app info, ReasonFlagged, and report link |
-| None of the above | Unknown | Present all available CustomDimensions fields and the URL |
+### Step 4.5: Infer Resource Owner When The KPI Identifies Concrete Azure Resources
 
-### Step 5: Render Report
+Apply this step when the investigation reveals a concrete Azure resource, especially for Type A items and Type C items that decode to explicit resources.
+
+Use the following precedence exactly:
+
+1. **Resource name match**
+2. **Resource group match**
+3. **Azure resource metadata match** via Azure MCP, Azure resource detail, or equivalent source by inspecting `systemData.createdBy`
+4. **Leave owner blank** if none of the above yields a reliable match
+
+Implementation rules:
+
+- Compare against the alias map above first. Do not invent new owners.
+- Resource name and resource group matching are intentionally lightweight. Match only on normalized whole-token or clear boundary-separated alias patterns such as `kevinguo`, `kevinguo-6215-resource`, `rg-lianweiai`, or `zhyan` when they clearly map back to one listed teammate.
+- Do not use fragile substring guesses. For short aliases such as `zhy`, require a clean token or boundary-separated match rather than an arbitrary substring.
+- If the resource name yields exactly one match, use it and do not override it with lower-priority sources.
+- If the resource name has no match, inspect the resource group using the same rule.
+- Only query Azure resource metadata when the first two steps fail.
+- When using Azure metadata, inspect `systemData.createdBy` and normalize common forms such as alias, UPN prefix, or mail alias before matching to the alias map.
+- If more than one teammate matches at the same priority level, leave owner blank and explicitly mark the owner as ambiguous rather than guessing.
+- Always keep the evidence source with the owner annotation, for example `resourceName`, `resourceGroup`, or `systemData.createdBy`.
+- Distinguish owner **confidence** from owner **precedence**. Resource name and resource group are heuristic; `systemData.createdBy` is metadata-backed. Even so, precedence remains the ordered rule chain above unless the higher-priority result is ambiguous.
+
+### Step 5: Follow Evidence Links
+
+After identifying the affected objects, follow all available evidence links in this priority order:
+
+1. `item.URL`
+2. Links embedded in KPI metadata description
+3. `CustomDimensions.ActionWikiLink`
+4. `CustomDimensions.url2`
+5. `reportUrl`
+6. `CustomDimensions.AssetTypeLink0`
+7. Any other URL-bearing field in the payload
+
+For each source:
+- Fetch it when readable.
+- If `fetch_webpage` fails, returns incomplete content, or appears to be blocked by rendering or auth flow, try the browser / Playwright MCP path before declaring a blocker.
+- Extract concrete remediation steps, affected scope, ownership clues, environment information, and verification steps.
+- Follow nested links when they add new actionable detail.
+- Stop traversing a branch when it becomes redundant, circular, or no longer yields new evidence.
+
+Browser fallback should be used especially for:
+- Azure DevOps work item pages that render useful fields client-side
+- ASP support docs that may not be captured well by static fetch
+- Internal portals that redirect before showing readable content
+
+Only declare a blocker after both direct fetch and browser-based inspection fail or still require unavailable credentials.
+
+### Step 6: Correlate With Service Context
+
+Ground the interpretation in repo-known service context:
+- **Service name**: Azure SignalR Service
+- **TargetId**: `624c481d-e51c-4016-a522-fbe180d125fc`
+- **Known resource family**: `microsoft.signalrservice/signalr` and related service assets
+- **Known workflow context**: previously saved S360 reports under `Tasks/S360_Dashboard/` and service-specific wording found in linked evidence
+
+Explicitly connect the findings to the service. Do not stop at generic KPI prose when the evidence points to a concrete Azure SignalR Service workflow, app, or asset.
+
+If likely owners were identified for concrete Azure resources, connect those owners back to the service context carefully. Present them as operational routing hints, not authoritative service ownership, unless the source is explicit.
+
+### Step 7: Ask the User Only After Readable Sources Are Exhausted
+
+Only ask a targeted follow-up question if all readable sources have been exhausted and one narrow ambiguity still prevents a reliable explanation of the exact required work.
+
+If the missing detail is caused by a hard blocker such as auth or corpnet, report the blocker instead of asking the user to restate the problem.
+
+### Step 8: Render an Evidence-Chain Report
+
+Use an evidence-oriented report that clearly separates verified findings, synthesis, remaining ambiguity, and blockers.
+
+## Output Template
 
 Structure the output as:
 
@@ -77,76 +185,84 @@ Structure the output as:
 **Due Date**: {earliest CurrentDueDate}
 **Exceptions**: {total ExceptionCount}
 **Clouds**: {distinct cloudType values}
+**Type**: {Type A/B/C/D/E/Unknown}
 
-### Remediation
-- **TSG**: [link]({URL})
-- **Wiki**: [link]({ActionWikiLink})  (if available)
+### Summary
+{1-2 sentences explaining what the service team must do}
 
-### Affected Resources
+### What This Task Is
+{Explain the requirement, why the service is affected, and the scope backed by evidence}
 
-{Type-specific content — see below}
+### Evidence Reviewed
+- {source and what it revealed}
+- {source and what it revealed}
+
+### Concrete Work Items
+- {specific action item}
+- {specific action item}
+
+### Service-Specific Mapping
+{Explain how the task maps to Azure SignalR Service resources, apps, workflows, or owners}
+
+### Affected Resources / Affected Objects
+{Type-specific content with explicit action wording}
+
+### Open Questions / Ambiguities
+- {only unresolved items after evidence review}
+
+### Blockers
+- **Source**: {URL or source name}
+	**Blocker Type**: {auth, corpnet, unsupported tool, dead link}
+	**Access Needed**: {what the user or owner would need}
 
 ### Next Steps
-{Remediation guidance from KPI metadata if available}
+1. {highest-priority next step}
+2. {follow-up step}
+3. {escalation or verification step}
 ```
 
-**Type A output** (direct resourceId):
+### Type-Specific Expectations
+
+**Type A**
+- Show each resource and state the concrete remediation action for that resource.
+- When possible, annotate each resource with a likely owner, owner evidence source, and owner confidence.
+
+Example columns:
+
 ```markdown
-| # | Resource ID | Subscription | Resource Group | SLA Status | Due Date |
-|---|------------|--------------|----------------|------------|----------|
-| 1 | /subscriptions/.../signalr/name | 9caf2a1e-... | myresourcegroup | InSla | 2026-06-29 |
+| Resource ID | Subscription | Resource Group | Likely Owner | Owner Evidence | Owner Confidence | Action Required | SLA Status | Due Date |
+|-------------|--------------|----------------|--------------|----------------|------------------|-----------------|------------|----------|
 ```
 
-**Type B output** (aggregated dashboard):
-```markdown
-**Total Affected**: {TotalCount} ({AssetType0})
-**Environments**: {Environments}
-**Dashboard**: [View in Azure Data Explorer]({AssetTypeLink0})
-**Remediation Wiki**: [Action Guide]({ActionWikiLink})
-```
+**Type B**
+- Explain what the aggregated dashboard represents and what action must be taken on the affected asset class.
 
-**Type C output** (Azure Resource Graph):
-```markdown
-**Subscription**: {SubscriptionId}
-**Region**: {Region}
-**Items to Mitigate**: {ItemsToMitigate}
-**VNets to Mitigate**: {TotalVNetsToMitigate}
+**Type C**
+- Decode the ARG query, explain what condition it is identifying, and state what configuration must change.
 
-**Azure Resource Graph Query** (run in Azure Portal → Resource Graph Explorer):
-```kusto
-{decoded query from URL}
-`` `
+**Type D**
+- Explain what the application or identity is missing and what compliance or onboarding action is required.
 
-**Portal Link**: [Open in Azure Portal]({URL})
-```
-
-**Type D output** (app-based):
-```markdown
-| App ID | App Name | Reason Flagged | Cloud | Report |
-|--------|----------|----------------|-------|--------|
-| {ApplicationId} | {AppName} | {ReasonFlagged} | {cloudType} | [Report]({reportUrl}) |
-```
-
-### Step 6: Save to File
-
-Save the report to `Tasks/S360_Dashboard/{yyyyMMdd_HHmmss}_detail_{kpiId_first8chars}.md` using UTC timestamp.
+**Type E**
+- Focus on deliverables such as onboarding steps, ADO work items, documentation fixes, diagnostics updates, or checklist completion. These are not resource-remediation KPIs and should not be forced into a resource table if the evidence points to workflow work.
 
 ## Quick Reference
 
 | Situation | Action |
 |-----------|--------|
-| User gives a KPI ID | Fetch all items for that KPI, extract resources |
-| User gives a title | Search all items, filter by title, then extract |
-| User asks "what resources need fixing for X" | Same as title-based lookup |
-| ResourceIds found directly | Show ARM resource table |
-| No direct ResourceIds | Provide dashboard/query links with instructions |
-| Kusto query available in KPI metadata | Best-effort: try execute via kusto MCP |
+| User gives a KPI ID | Fetch items, extract objects, follow evidence links, synthesize work items |
+| User gives a title | Search by title, then run the same investigation flow |
+| User asks what work must be done | Emphasize `Concrete Work Items` and `Service-Specific Mapping` |
+| KPI is process or onboarding oriented | Treat work item pages, docs, and checklists as primary evidence |
+| Evidence remains ambiguous | Ask one targeted question only after readable sources are exhausted |
+| Next source is inaccessible | Report an explicit blocker with the required access |
 
 ## Important Notes
 
-- Resource extraction is **best-effort**. If a source is inaccessible (Kusto cluster auth, private dashboard), provide the link and explain what access is needed rather than failing.
-- For Type B (dashboard) items, the `AssetTypeLink0` URL often contains time-bound parameters (`StartDt`, `EndDt`). Mention that the data window is time-scoped and the user may need to refresh the dashboard.
-- For Type C (ARG query) items, the URL-encoded query in the `URL` field needs proper decoding (`%0D%0A` → newline, `%7C` → pipe, etc.). Always decode before presenting.
-- Some items may have `ExceptionCount > 0`, indicating approved exceptions. Note this when presenting — these items have had their SLA extended.
-- The `URL` field serves different purposes per KPI type: it may be an eng.ms TSG doc, an ADX dashboard, or an Azure Portal ARG explorer link. Don't assume it's always a TSG.
-- **Where to find TSG docs**: Most TSGs are hosted on eng.ms (check `URL` field and KPI metadata description). Some are referenced in Kusto dashboard descriptions. Always present any eng.ms link prominently as the primary remediation reference.
+- Investigation is multi-hop by default. A shallow summary of the S360 payload is not sufficient when linked evidence exists.
+- Distinguish **verified evidence** from **inference**. Make it clear which statements came from accessible sources and which are reasoned synthesis.
+- Prefer synthesis over dumping links. The goal is to explain what the service team must do, not merely where more information might exist.
+- When static fetch is insufficient, use browser-based inspection before concluding a page is blocked. A blocker should reflect the strongest attempt actually made.
+- If a source cannot be read, report it as a blocker with exact access guidance rather than quietly stopping.
+- Keep the analysis grounded to Azure SignalR Service context whenever the evidence allows it.
+- Likely owner annotations are for routing and investigation acceleration. They are not authoritative ownership claims unless backed by explicit metadata or a directly readable source.
