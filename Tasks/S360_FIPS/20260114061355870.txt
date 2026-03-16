@@ -1,4 +1,0 @@
-[2026-01-14 14:14:47] S360 FIPS Compliance Check
-[2026-01-14 14:14:47] Total VMs found: 48
-[2026-01-14 14:14:47] Results exported to: 20260114061355870.csv
-[2026-01-14 14:14:47] Markdown report: 20260114061355870.md

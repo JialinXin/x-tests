@@ -41,6 +41,10 @@
 			],
 			"type": "stdio"
 		},
+		"ICM MCP Server": {
+			"type": "http",
+			"url": "https://icm-mcp-prod.azure-api.net/v1/"
+		},
 		"teams": {
 			"command": "agency",
 			"args": [

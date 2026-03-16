@@ -94,7 +94,7 @@
 	```
 
 ## Recording Results
-- Create a run result named `yyyyMMddfff.md` (`fff` = milliseconds, UTC) in `Tasks/S360_SecurityPack/` after **successful** execution only.
+- Create a run result named `yyyyMMddfff.md` (`fff` = milliseconds, UTC) in `output/S360_SecurityPack/` after **successful** execution only.
 - Create a run log named `yyyyMMddfff.txt` to capture execution steps: Summary, Executed Steps, Status (Success or Failure with detailed error messages and exceptions).
 - **For failed executions**: Create ONLY the log file (.txt) documenting the failure point, error type, error message, and timestamp. Do NOT create result files (.md, .csv) for failed runs.
 - Treat run logs as immutable; add new timestamped files for reruns or corrections.

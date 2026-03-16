@@ -157,7 +157,7 @@ Ground the interpretation in repo-known service context:
 - **Service name**: Azure SignalR Service
 - **TargetId**: `624c481d-e51c-4016-a522-fbe180d125fc`
 - **Known resource family**: `microsoft.signalrservice/signalr` and related service assets
-- **Known workflow context**: previously saved S360 reports under `Tasks/S360_Dashboard/` and service-specific wording found in linked evidence
+- **Known workflow context**: previously saved S360 reports under `output/S360_Dashboard/` and service-specific wording found in linked evidence
 
 Explicitly connect the findings to the service. Do not stop at generic KPI prose when the evidence points to a concrete Azure SignalR Service workflow, app, or asset.
 

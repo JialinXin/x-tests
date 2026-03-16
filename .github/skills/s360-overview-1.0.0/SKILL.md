@@ -100,7 +100,7 @@ At the bottom of each severity section, add a brief hint: _"Use s360-item-detail
 
 ### Step 5: Save to File
 
-Save the full report to `Tasks/S360_Dashboard/{yyyyMMdd_HHmmss}_overview.md` using UTC timestamp.
+Save the full report to `output/S360_Dashboard/{yyyyMMdd_HHmmss}_overview.md` using UTC timestamp.
 
 ## Quick Reference
 
