@@ -7,7 +7,7 @@
 
 ## Directory Structure
 ```text
-Tasks/
+workflow/
 ├─ <T1>/
 │  ├─ Workflow.md
 │  ├─ yyyyMMddfff.md

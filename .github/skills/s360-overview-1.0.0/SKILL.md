@@ -75,9 +75,9 @@ Present a markdown table ordered by severity (Red → Yellow → Green):
 
 ### 🔴 Red (Out of SLA)
 
-| KPI Title | KPI ID | Items | Due Date | Exceptions | Clouds | S360 | TSG |
-|-----------|--------|-------|----------|------------|--------|------|-----|
-| {Title} | `{kpiId}` | {count} | {earliest due} | {exceptions} | {clouds} | [S360]({resolved S360 URL}) | [TSG]({URL}) |
+| KPI Title | KPI ID | Items | Due Date | Exceptions | Clouds | TSG |
+|-----------|--------|-------|----------|------------|--------|-----|
+| {Title} | `{kpiId}` | {count} | {earliest due} | {exceptions} | {clouds} | [TSG]({URL}) |
 
 ### 🟡 Yellow (Approaching SLA)
 
@@ -87,12 +87,6 @@ Present a markdown table ordered by severity (Red → Yellow → Green):
 
 (same table format)
 ```
-
-**S360 link resolution**: Resolve the S360 URL in this exact order:
-1. If the S360 API response already includes a dedicated KPI-detail URL for the group, use that exact URL verbatim.
-2. Otherwise, use the full people-scoped dashboard URL from `references/service-config.md` exactly as written there.
-
-Do not invent or synthesize a per-KPI S360 URL from `KpiId` alone unless a verified URL template has been documented in `references/service-config.md`. Do not shorten the dashboard fallback to only `peopleBasedNodes=...`; preserve the full URL including the `blade` and `global` parameters.
 
 **TSG column**: Show the `URL` field value (usually an eng.ms TSG doc link). If `CustomDimensions.ActionWikiLink` is also available, show it as a second link.
 

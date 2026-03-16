@@ -15,13 +15,13 @@ Use this exact column order:
 | # of customer impact | Customer impact flag or count when available |
 | # of occurrence | Hit count or occurrence count when meaningful |
 | Root cause | Owner-enriched RCA field, blank by default |
-| Bug and/or ICM to external team | External escalation, linked bug, or partner ICM |
-| Error msg | Short error summary only |
-| Notes | Draft note and clickable incident title |
+| Bug and/or ICM to external team | One representative incident title with clickable ICM URL; append external escalation only when concise and clearly relevant |
+| Error msg | Blank by default in the draft; owner may fill later |
+| Notes | Draft cluster summary and transient/manual-review rationale |
 
 ## Markdown Table
 
-Use this header for both active and mitigated sections:
+Use this header for both issue-type sections:
 
 ```markdown
 | Day / time | RP / Run / Reported by customer | Severity | Status | # of customer impact | # of occurrence | Root cause | Bug and/or ICM to external team | Error msg | Notes |
@@ -34,17 +34,19 @@ Use this header for both active and mitigated sections:
 - Keep `Severity` as the numeric ICM value.
 - Keep `Status` as the exact ICM state string.
 - Keep `Root cause` blank unless strong evidence exists.
-- Keep long stack traces out of `Error msg`; compress to a phrase or leave blank.
-- Put the clickable incident title in `Notes` when there is no better column to hold it cleanly.
+- Keep `Error msg` blank unless the user explicitly asks for a populated draft.
+- Put the clickable sampled incident title in `Bug and/or ICM to external team`.
+- Use `Notes` for the cluster summary only.
 
 ## Example Row
 
 ```markdown
-| 2026-02-09 03:58 UTC | Runtime | 3 | MITIGATED |  | 107 |  |  | Timeout on table requests | [Incident 745248815: [TableErrors] Table requests has continuous failures of Timeout](https://portal.microsofticm.com/imp/v3/incidents/details/745248815/home). Sampled as likely transient and auto-mitigated; owner should confirm root cause from discussion. |
+| 2026-02-09 03:58 UTC | Runtime | 3 | MITIGATED |  | 107 |  | [Incident 745248815: [TableErrors] Table requests has continuous failures of Timeout](https://portal.microsofticm.com/imp/v3/incidents/details/745248815/home) |  | Sampled incidents look auto-mitigated and repetitive, so this family can be treated as transient in the draft. Owner should confirm the backend timeout pattern later. |
 ```
 
 ## Section Policy
 
-- `## Active Incidents` should appear first.
-- `## Mitigated Incidents` should appear second.
+- `## Transient` should appear first.
+- `## Needs Manual Review` should appear second.
 - If there are no incidents in a section, state that explicitly instead of omitting the section.
+- The report header should include the filtered weekly incident total, the aggregated table total, and a short reconciliation note.
