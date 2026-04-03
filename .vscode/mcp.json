@@ -1,0 +1,71 @@
+{
+	"servers": {
+		"microsoft/playwright-mcp": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"@playwright/mcp@latest"
+			],
+			"gallery": "https://api.mcp.github.com",
+			"version": "0.0.1-seed"
+		},
+		"s360-breeze": {
+			"url": "https://mcp.vnext.s360.msftcloudes.com",
+			"type": "http"
+		},
+		"ado": {
+			"command": "agency",
+			"args": [
+				"mcp",
+				"ado",
+				"--organization",
+				"msazure"
+			],
+			"type": "stdio"
+		},
+		"es-chat": {
+			"command": "agency",
+			"args": [
+				"mcp",
+				"es-chat"
+			],
+			"type": "stdio"
+		},
+		"kusto": {
+			"command": "agency",
+			"args": [
+				"mcp",
+				"kusto",
+				"--service-uri",
+				"https://signalrinsights.eastus2.kusto.windows.net/"
+			],
+			"type": "stdio"
+		},
+		"ICM MCP Server": {
+			"type": "http",
+			"url": "https://icm-mcp-prod.azure-api.net/v1/"
+		},
+		"teams": {
+			"command": "agency",
+			"args": [
+				"mcp",
+				"teams"
+			],
+			"type": "stdio"
+		},
+		"com.microsoft/azure": {
+			"type": "stdio",
+			"command": "dnx",
+			"args": [
+				"Azure.Mcp@2.0.0-beta.26",
+				"--yes",
+				"--",
+				"server",
+				"start"
+			],
+			"gallery": "https://api.mcp.github.com",
+			"version": "2.0.0-beta.26"
+		}
+	},
+	"inputs": []
+}
