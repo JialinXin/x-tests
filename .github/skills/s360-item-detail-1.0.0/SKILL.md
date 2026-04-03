@@ -34,6 +34,7 @@ Use this map when inferring likely owners from Azure resource names, resource gr
 | Name | Alias |
 |------|-------|
 | Binjie Qian | `biqian` |
+| Chenyang Liu | `chenyl` |
 | Dayang Shen | `dayshen` |
 | Haofan Liao | `haofanliao` |
 | Jialin Xin | `jixin` |
@@ -107,9 +108,9 @@ Apply this step when the investigation reveals a concrete Azure resource, especi
 
 Use the following precedence exactly:
 
-1. **Resource name match**
-2. **Resource group match**
-3. **Azure resource metadata match** via Azure MCP, Azure resource detail, or equivalent source by inspecting `systemData.createdBy`
+1. **Azure resource metadata match** via Azure MCP, Azure resource detail, or equivalent source by inspecting `systemData.createdBy`
+2. **Resource name match**
+3. **Resource group match**
 4. **Leave owner blank** if none of the above yields a reliable match
 
 Implementation rules:
